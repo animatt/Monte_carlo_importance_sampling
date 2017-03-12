@@ -17,39 +17,41 @@ figure, colormap(gray), surf(GR1), title('GR1'), axis equal % 30 x 32
 figure, colormap(gray), surf(GR2), title('GR2'), axis equal % 32 x 17
 
 % initialize learning parameters for GR1
-% (rows, columns, y', x'[, y'', x''])
+% (rows, columns, y', x'[, y'', x''][, u''])
 [m, n] = size(GR1);
-
-target_policy = zeros(m, n, m - 1, n - 2);
-% behavior_policy = randomly accelerate forward / backward
 Qsa = zeros(m, n, m - 1, n - 2, 3, 3);
-% returns = zeros(m, n, m - 1, n - 2, 3, 3);
-import_ratios = zeros(m, n, m - 1, n - 2);
+import_ratio = zeros(m, n, m - 1, n - 2, 3, 3);
+% behavior_policy = randomly accelerate forward/backward
+target_policy = ones(m, n, m - 1, n - 2, 2);
 
 converging = true;
 while converging
     reward = 1;
-    stata = [];
+    ep_hist = [];
     
     % initialize agent
+    row = m;
+    col = datasample(find(GR1(end, :) == 1.5), 1); % start line index
     rowv = 0; % y' velocity
     colv = 0; % x' velocity
-    start = datasample(find(GR1(end, :) == 1.5), 1); % start line index
-    [row, col] = ind2sub(size(GR1), position);
     
     race_in_progress = true;
     while race_in_progress
-        state_action_pair = [row col; rowv colv; 0 0];
+        
         reward = reward - 1;
         
-        % agent follows behavior policy
+        % update importance ratio
+        behavior_policy = (row > 0) * 1 / 3 + (row == 0) * 1 / 2;
+        next_ratio = 1 / behavior_policy;
+        
+        % agent follow behavior policy
         if rowv > 0
             action_taken = randi([-1 1]);
         else
             action_taken = randi([0 1]);
         end
-        
-        state_action_pair(3, 1) = action_taken;
+
+        episode = [row, col, rowv, colv, action_taken, 0, behavior_policy]';
         rowv = rowv + action_taken;
         
         if colv > 0
@@ -57,37 +59,40 @@ while converging
         else
             action_taken = randi([0 1]);
         end
-        
-        state_action_pair(3, 2) = action_taken;
+
+        episode(6) = action_taken;
         colv = colv + action_taken;
         
-        stata = cat(3, stata, state_action_pair);
+        % update history
+        ep_hist = [ep_hist, episode]; % grow array efficiently in last Dim
         
         % update position
-        row = row + rowv;
+        row = row - rowv; % y velocity is negative
         col = col + colv;
         
-        % check for collision with barrier or finish line
+        % check collision with barrier/finish line
         if GR1(row, col) == 1
-            start = datasample(find(GR1(end, :) == 1.5), 1);
-            [row, col] = ind2sub(size(GR1), position);
-        elseif GR1(row, col) == 1.5 && row ~= 1
+            row = m;
+            col = datasample(find(GR1(end, :) == 1.5), 1);
+        elseif GR1(row, col) == 1.5 && row ~= m
             race_in_progress = false;
         end
     end
     
-    % assign returns
-%     SA = sub2ind(size(returns), stata(1, 1, :), stata(1, 2, :), ...
-%         stata(2, 1, :), stata(2, 2, :), stata(3, 1, :), stata(3, 2, :));
-%     returns(SA) = returns(SA) + (-1 : -1 : reward)';
+    T = array2table(ep_hist', 'VariableNames', ...
+        {'R', 'C', 'Rv', 'Cv', 'Ra', 'Ca', 'importance_ratio'});
     
+    W = cumprod(T.importance_ratio, 'reverse');
+    G = (0 : -1 : reward)';
     
-    % increment importance sampling ratios
-    SS = sub2ind(size(import_ratios), stata(1, 1, :), stata(1, 2, :), ...
-        stata(2, 1, :), stata(2, 2, :));
-    import_ratios(SS) = import_ratios(SS) + prod(policy(SS) ./ ...
-        (((stata(2, 1, :) > 0) * 1 / 3 + (stata(2, 1, :) == 0) * 1 / 2) .* ...
-        ((stata(2, 2, :) > 0) * 1 / 3 + (stata(2, 2, :) == 0) * 1 / 2)));
+    % use importance ratio to adjust expected value
+    SA = sub2ind(size(Qsa), T.R, T.C, T.Rv, T.Cv, T.Ra, T.Ca);
+    Qsa(SA) = Qsa(SA) + W ./ C(SA) .* (G - Qsa(SA));
     
-    
+    % improve policy
+    SS = sub2ind(2 \ size(target_policy), T.R, T.C, T.Rv, T.Cv);
+    QSub = Qsa(T.R, T.C, T.Rv, T.Cv, :, :);
+    [~, II] = max(QSub(:)); % may need to set some vals NaN
+    [Rbest, Cbest] = ind2sub(size(Qsub), II);
+    target_policy(SS, :) = [Rbest; Cbest];
 end
