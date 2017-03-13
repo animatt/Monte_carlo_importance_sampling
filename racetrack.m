@@ -48,7 +48,7 @@ while converging
         reward = reward - 1;
         
         % update importance ratio
-        behavior_policy = (row > 0) * 1 / 3 + (row == 0) * 1 / 2;
+        behavior_policy = (row < m) * 1 / 3 + (row == m) * 1 / 2;
         next_ratio = 1 / behavior_policy;
         
         % agent follow behavior policy
