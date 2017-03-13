@@ -94,18 +94,19 @@ while converging
     T = array2table(ep_hist', 'VariableNames', ...
         {'R', 'C', 'Rv', 'Cv', 'Ra', 'Ca', 'importance_ratio'});
     
+    SA = sub2ind(size(Qsa), T.R, T.C, T.Rv, T.Cv, T.Ra, T.Ca);
+    
     W = cumprod(T.importance_ratio, 'reverse');
     G = (0 : -1 : reward)';
-    import_ratios(T.R, T.C, T.Rv, T.Cv, T.Ra, T.Rc) = ...
-        import_ratios(T.R, T.C, T.Rv, T.Cv, T.Ra, T.Ca) + W;
+    import_ratios(SA) = import_ratios(SA) + W;
     
     % use importance ratio to adjust expected value
-    SA = sub2ind(size(Qsa), T.R, T.C, T.Rv, T.Cv, T.Ra, T.Ca);
     Qsa(SA) = Qsa(SA) + W ./ import_ratios(SA) .* (G - Qsa(SA));
     
     % improve policy
-    SS = sub2ind(2 \ size(target_policy), T.R, T.C, T.Rv, T.Cv);
-    QSub = Qsa(T.R, T.C, T.Rv, T.Cv, :, :);
+    sz = size(Qsa);
+    SS = sub2ind(sz(1 : 4), T.R, T.C, T.Rv, T.Cv);
+    QSub = Qsa(SS, :, :);
     [~, II] = max(QSub(:)); % may need to set some vals NaN
     [Rbest, Cbest] = ind2sub(size(Qsub), II);
     target_policy(SS, :) = [Rbest; Cbest];
