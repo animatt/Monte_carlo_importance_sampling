@@ -17,7 +17,7 @@ GR1 = imformat('track1.png', [30 32]);
 % figure, colormap(gray), surf(GR2), title('GR2'), axis equal % 32 x 17
 
 % initialize learning parameters for GR1
-% (rows, columns, y', x'[, y'', x''][, u''])
+% ([y'', x'', ][u'', ]rows, columns, y', x')
 [m, n] = size(GR1);
 
 r = roots([1, 1, 2 * (1 - m)]);
@@ -25,12 +25,13 @@ r1 = ceil(r(r > 0));
 r = roots([1, 1, 2 * (2 - n)]);
 r2 = ceil(r(r > 0));
 
-Qsa = zeros(m, n, r1, r2, 3, 3);
-import_ratios = zeros(m, n, r1, r2, 3, 3);
+Qsa = zeros(3, 3, m, n, r1, r2);
+import_ratios = zeros(3, 3, m, n, r1, r2);
 % behavior_policy = randomly accelerate forward/backward
-target_policy = ones(m, n, r1, r2, 2);
+target_policy = ones(2, m, n, r1, r2);
 
 converging = true;
+counter = 0;
 while converging
     reward = 1;
     ep_hist = [];
@@ -57,7 +58,7 @@ while converging
             action_taken = randi([0 1]);
         end
 
-        episode = [row, col, rowv, colv, action_taken, 0, next_ratio]';
+        episode = [action_taken, 0, row, col, rowv, colv, next_ratio]';
         rowv = rowv + action_taken;
         
         if colv > 0
@@ -66,7 +67,7 @@ while converging
             action_taken = randi([0 1]);
         end
 
-        episode(6) = action_taken;
+        episode(2) = action_taken;
         colv = colv + action_taken;
         
         % update history
@@ -87,14 +88,13 @@ while converging
             race_in_progress = false;
         end
     end
-    
     % formatting
-    ep_hist(5 : 6, :) = ep_hist(5 : 6, :) + 2;
-    ep_hist(3 : 4, :) = ep_hist(3 : 4, :) + 1;
+    ep_hist(1 : 2, :) = ep_hist(1 : 2, :) + 2;
+    ep_hist(5 : 6, :) = ep_hist(5 : 6, :) + 1;
     T = array2table(ep_hist', 'VariableNames', ...
-        {'R', 'C', 'Rv', 'Cv', 'Ra', 'Ca', 'importance_ratio'});
+        {'Ra', 'Ca', 'R', 'C', 'Rv', 'Cv', 'importance_ratio'});
     
-    SA = sub2ind(size(Qsa), T.R, T.C, T.Rv, T.Cv, T.Ra, T.Ca);
+    SA = sub2ind(size(Qsa), T.Ra, T.Ca, T.R, T.C, T.Rv, T.Cv);
     
     W = cumprod(T.importance_ratio, 'reverse');
     G = (0 : -1 : reward)';
@@ -105,9 +105,14 @@ while converging
     
     % improve policy
     sz = size(Qsa);
-    SS = sub2ind(sz(1 : 4), T.R, T.C, T.Rv, T.Cv);
-    QSub = Qsa(SS, :, :);
-    [~, II] = max(QSub(:)); % may need to set some vals NaN
-    [Rbest, Cbest] = ind2sub(size(Qsub), II);
-    target_policy(SS, :) = [Rbest; Cbest];
+    SS = sub2ind(sz(3 : 6), T.R, T.C, T.Rv, T.Cv);
+    
+    QSub = permute(Qsa(:, :, SS), [3 1 2]);
+    QSub(QSub == 0) = NaN;
+    
+    [~, II] = max(QSub(:, :), [], 2); % may need to set some vals NaN
+    [Rbest, Cbest] = ind2sub(size(QSub), II);
+    target_policy(:, SS) = [Rbest'; Cbest'];
+    
+    counter = counter + 1;
 end
