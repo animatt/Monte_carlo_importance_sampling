@@ -1,7 +1,7 @@
 clear, clc, close all
 
-% Racing on a simulated track. The agent learns to navigate and complete a 
-% non-trivial racetrack without crashing into the borders in the shortest
+% Racing on a simulated course. The agent learns to navigate and complete a 
+% non-trivial course without crashing into the borders in the shortest
 % time possible. In order to do this, the agent must manage its
 % velocity vector in 2-D. It can accelerate in either component by +- 1
 % pixel per iteration, and neither component can be negative. On every
@@ -10,16 +10,19 @@ clear, clc, close all
 % on any iteration it must return to the starting line. This simulation
 % utilizes an off-policy Monte Carlo learning algorithm.
 
-GR1 = imformat('track1.png', [30 32]);
+debug = false;
+
+[GR1, bound1, bound2] = imformat('track1.png', [30 32]);
 % GR2 = imformat('track2.png', [32 17]);
 
-% figure, colormap(gray), surf(GR1), title('GR1'), axis equal % 30 x 32
+figure, colormap(gray), imagesc(GR1), title('GR1'), axis equal % 30 x 32
 % figure, colormap(gray), surf(GR2), title('GR2'), axis equal % 32 x 17
 
 % initialize learning parameters for GR1
 % ([y'', x'', ][u'', ]rows, columns, y', x')
 [m, n] = size(GR1);
 
+% Ascertain limits on the agent's velocity
 r = roots([1, 1, 2 * (1 - m)]);
 r1 = ceil(r(r > 0));
 r = roots([1, 1, 2 * (2 - n)]);
@@ -39,8 +42,7 @@ while converging
     % initialize agent
     row = m;
     col = datasample(find(GR1(end, :) == 1.5), 1); % start line index
-    rowv = 0; % y' velocity
-    colv = 0; % x' velocity
+    [rowv, colv] = deal(0);
     
     race_in_progress = true;
     while race_in_progress
@@ -79,17 +81,34 @@ while converging
         
         % check collision with barrier/finish line
         % must allow agent to exit bounds across the finish line however
-        if ~finish_line_crossed
-            if ~inbounds(size(GR1), row, col) || GR1(row, col) == 1
+        if ~inbounds(size(GR1), row, col)
+            Y = ([bound1 bound2] - episode(3 : 4) * ones(1, 2))';
+            diff = diag([-1 1]) * flipud([row; col] - episode(3 : 4));
+            if prod(Y * diff) < 0 % incorrect vector x
+                race_in_progress = false; % crossed finish line
+                if debug
+                    fprintf('finish crossed\n')
+                end
+            else
                 row = m;
                 col = datasample(find(GR1(end, :) == 1.5), 1);
-                rowv = 0;
-                colv = 0;
-            elseif GR1(row, col) == 1.5 && row ~= m
-                race_in_progress = false;
+                [rowv, colv] = deal(0);
+                if debug
+                    fprintf('out of bounds\n')
+                end
             end
-        else
+        elseif GR1(row, col) == 1
+            row = m;
+            col = datasample(find(GR1(end, :) == 1.5), 1);
+            [rowv, colv] = deal(0);
+            if debug
+                fprintf('crashed\n')
+            end
+        elseif row ~= m && GR1(row, col) == 1.5
             race_in_progress = false;
+            if debug
+                fprintf('touched finish line\n')
+            end
         end
     end
     % formatting
