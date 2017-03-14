@@ -79,12 +79,16 @@ while converging
         
         % check collision with barrier/finish line
         % must allow agent to exit bounds across the finish line however
-        if ~inbounds(size(GR1), row, col) || GR1(row, col) == 1
-            row = m;
-            col = datasample(find(GR1(end, :) == 1.5), 1);
-            rowv = 0;
-            colv = 0;
-        elseif GR1(row, col) == 1.5 && row ~= m
+        if ~finish_line_crossed
+            if ~inbounds(size(GR1), row, col) || GR1(row, col) == 1
+                row = m;
+                col = datasample(find(GR1(end, :) == 1.5), 1);
+                rowv = 0;
+                colv = 0;
+            elseif GR1(row, col) == 1.5 && row ~= m
+                race_in_progress = false;
+            end
+        else
             race_in_progress = false;
         end
     end
