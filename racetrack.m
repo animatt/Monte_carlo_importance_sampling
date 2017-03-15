@@ -143,7 +143,7 @@ while converging
     % policy improvement
     % Is this correct? Double check. Edit: yeah, seems right
     [~, II] = max(QSub(:, :), [], 2); % may need to set some vals NaN
-    [Rbest, Cbest] = ind2sub(size(QSub), II);
+    [Rbest, Cbest] = ind2sub([3 3], II);
     target_policy(:, SS) = [Rbest'; Cbest'];
     
     counter = counter + 1;
