@@ -10,6 +10,13 @@ clear, clc, close all
 % on any iteration it must return to the starting line. This simulation
 % utilizes an off-policy Monte Carlo learning algorithm.
 
+% It is difficult to assess if the learning algorithm is correctly
+% implemented as the values of the sums of importance ratios go to infinity
+% and this causes the code to fail. It seems that the best way forward
+% would be to make the behavior policy epsilon greedy to the target policy
+% and therefore reduce gradually the avg length of an episode. This would
+% have a very significant effect on the size of C(SA).
+
 debug = false;
 
 [GR1, bound1, bound2] = imformat('track1.png', [30 32]);
@@ -133,6 +140,8 @@ while converging
     QSub = permute(Qsa(:, :, SS), [3 1 2]);
     QSub(QSub == 0) = NaN;
     
+    % policy improvement
+    % Is this correct? Double check. Edit: yeah, seems right
     [~, II] = max(QSub(:, :), [], 2); % may need to set some vals NaN
     [Rbest, Cbest] = ind2sub(size(QSub), II);
     target_policy(:, SS) = [Rbest'; Cbest'];
