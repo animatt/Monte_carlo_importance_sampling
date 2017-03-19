@@ -29,7 +29,7 @@ figure, colormap(gray), imagesc(GR1), title('GR1'), axis equal % 30 x 32
 % ([y'', x'', ][u'', ]rows, columns, y', x')
 [m, n] = size(GR1);
 
-% Ascertain limits on the agent's velocity
+% Ascertain agent's maximum velocity
 r = roots([1, 1, 2 * (1 - m)]);
 r1 = ceil(r(r > 0));
 r = roots([1, 1, 2 * (2 - n)]);
